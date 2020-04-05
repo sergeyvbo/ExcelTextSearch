@@ -1,8 +1,9 @@
 ﻿using Microsoft.Win32;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using Excel = Microsoft.Office.Interop.Excel;
+using OfficeOpenXml;
 
 namespace ExcelTextSearch
 {
@@ -76,21 +77,31 @@ namespace ExcelTextSearch
         private void ButtonSearch_Click(object sender, RoutedEventArgs e)
         {
             string[] xlsFiles = Directory.GetFiles(TextBoxStartPath.Text, "*.xlsx", SearchOption.AllDirectories);
-            var app = new Excel.Application();
-            foreach (string file in xlsFiles)
+            foreach (var filename in xlsFiles)
             {
-                Excel.Workbook book = app.Workbooks.Open(file);
-                foreach (Excel.Worksheet worksheet in book.Worksheets)
+                using (ExcelPackage xlPackage = new ExcelPackage(new FileInfo(filename)))
                 {
-                    var range = worksheet.UsedRange;
-                    var result = range.Find(TextBoxSearch.Text);
-                    if (result != null)
+                    var myWorksheet = xlPackage.Workbook.Worksheets.First(); //select sheet here
+                    var totalRows = myWorksheet.Dimension.End.Row;
+                    var totalColumns = myWorksheet.Dimension.End.Column;
+
+                    for (var rowNum = 1; rowNum <= totalRows; rowNum++) //select starting row here
                     {
-                        listBoxSearchResult.Items.Add(file);
+                        var row = myWorksheet.Cells[rowNum, 1, rowNum, totalColumns].Select(c => c.Value?.ToString())
+                            .Where(c => c != null && c.Contains(TextBoxSearch.Text));
+                        if (!row.Any()) continue;
+                        listBoxSearchResult.Items.Add(filename);
                         break;
+
                     }
                 }
             }
+        }
+
+        private void listBoxSearchResult_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (listBoxSearchResult.SelectedItem.ToString() == string.Empty) return;
+            System.Diagnostics.Process.Start(listBoxSearchResult.SelectedItem.ToString());
         }
     }
 }
